@@ -17,6 +17,8 @@
 import os
 import datetime
 import numpy as np
+np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning) 
+import pandas as pd
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -26,6 +28,13 @@ class Strategy(object):
 		-- all Strategy should inheritate this class  
 		-- All Child Class should implement determin_action_of_a_day
 		-- within determin_actiion_of_a_day should update self.trade_record indicate long or short
+		-- Containing some tools to do simple analysis in general use, like draw a graph
+
+	balace: float, init balance allowance for a strategy on a product 
+	daily_price_hist: pd.Dataframe, price hist, o, h, l, c for a product
+	ticker: str, ticker for a product
+	trade_record: list [[date, price, quantity]], quantity < 0 means short
+
 	"""
 	def __init__(self, **args):
 		super(Strategy, self).__init__()
@@ -35,15 +44,18 @@ class Strategy(object):
 		self.data_start_date, self.data_end_date = min(self.daily_peice_hist['date']), max(self.daily_peice_hist['date'])
 
 		self.ticker = args['ticker']
-		self.sim_start_date = args['sim_start_date']
-
+		# self.trade_record = pd.DataFrame(columns=['date', 'price', 'quantity'])
+		self.trade_record = []
 		print("%s, start %s , end %s total %s records \n"%(self.ticker, self.data_start_date, self.data_end_date, len(self.daily_peice_hist)))
 
 		# logging.info("%s created \n"%(self.ticker))
+
 	def determin_action_of_a_day(self):
 		raise NotImplementedError()
 
 
+	def convert_trade_record_to_dataframe(self):
+		return pd.DataFrame(self.trade_record,columns=['date', 'price', 'quantity'])
 
 
 	def plot_trade_graph(self, date, price_hist):

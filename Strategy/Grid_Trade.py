@@ -7,7 +7,7 @@ class Grid_Trade(Strategy):
 	def __init__(self,**args):
 		super(Grid_Trade, self).__init__(**args)
 		# self.arg = arg
-
+		self.sim_start_date = args['sim_start_date']
 		self.init_central_point = self.daily_peice_hist[  self.daily_peice_hist['date'] == max(self.data_start_date, self.sim_start_date)  ]['c']
 
 		self.n_band_one_side, self.band_interval = args['n_band_one_side'], args['band_interval']
@@ -20,12 +20,12 @@ class Grid_Trade(Strategy):
 		self.band = np.array(self.band) * np.array([self.init_central_point])
 
 
-		self.grid_record, self.trade_record = [0],[]
+		self.grid_record = [0]
 
 		self.have_trigged_trade = 0
 
 		# print([ i for i in range(1, self.n_band_one_side*2+1)])
-		
+
 	#to allow trade within days
 	# TBD
 
@@ -37,7 +37,8 @@ class Grid_Trade(Strategy):
 		if len(close_of_today) == 0:
 			return 0
 
-		self.trade_record.append(0)
+		# self.trade_record.loc[len(self.trade_record)] = [date, close_of_today, 0 ]
+		self.trade_record.append( [ date, close_of_today, 0 ] )
 		grid = pd.cut( close_of_today['c'].values, self.band[0], labels=[ i for i in range(1, self.n_band_one_side*2+1)])[0]
 
 		if np.isnan(grid):
@@ -45,14 +46,18 @@ class Grid_Trade(Strategy):
 
 
 		if self.grid_record[-1] < grid and self.grid_record[-1] != 0:
-			print("%s %s short, current grid %s, c %.5f last_grid %s  \n"%(self.ticker, date ,grid, close_of_today['c'].values, self.grid_record[-1]))
-			self.trade_record[-1] = -1
+			# print("%s %s short, current grid %s, c %.5f last_grid %s  \n"%(self.ticker, date ,grid, close_of_today['c'].values, self.grid_record[-1]))
+			# self.trade_record[-1] = -1
+			# self.trade_record.loc[len(self.trade_record)-1] = [date, close_of_today, -1 ]
+			self.trade_record[-1] = [ date, close_of_today, -1 ]
 			self.have_trigged_trade += 1
 
 
 		if self.grid_record[-1] > grid and self.grid_record[-1] != 0:
-			print("%s %s long, current grid %s, c %.5f last_grid %s  \n"%(self.ticker, date ,grid, close_of_today['c'].values, self.grid_record[-1]))
-			self.trade_record[-1] = 1
+			# print("%s %s long, current grid %s, c %.5f last_grid %s  \n"%(self.ticker, date ,grid, close_of_today['c'].values, self.grid_record[-1]))
+			# self.trade_record[-1] = 1
+			# self.trade_record.loc[len(self.trade_record)-1] = [date, close_of_today, 1 ]
+			self.trade_record[-1] = [ date, close_of_today, 1 ]
 			self.have_trigged_trade += 1
 
 		self.grid_record.append(grid)
@@ -67,18 +72,19 @@ class Grid_Trade(Strategy):
 		Strategy.check_parents_dir_exist(output_path)
 
 		x = [datetime.datetime.strptime(d, "%Y-%m-%d").date() for d in date]
-		# x = [i for i in range(0,len(date))]
 		y = price_hist
+
+		trade_record = np.array(self.trade_record)[:,-1]
 
 		fig, ax = plt.subplots()
 		ax.plot(x, y, 'w', linewidth=0.25, label="c")
 
-		long_x = [ x[i] for i in range(0, len(price_hist)) if self.trade_record[i] == 1]
-		long_action = [ price_hist[i] for i in range(0, len(price_hist)) if self.trade_record[i] == 1 ]
+		long_x = [ x[i] for i in range(0, len(price_hist)) if trade_record[i] == 1 ]
+		long_action = [ price_hist[i] for i in range(0, len(price_hist)) if trade_record[i] == 1 ]
 		ax.scatter(long_x, long_action, c = 'g', marker = '^',   s= 1.0, label = 'l')
 
-		short_x = [ x[i] for i in range(0, len(price_hist)) if self.trade_record[i] == -1]
-		short_action = [ price_hist[i] for i in range(0, len(price_hist)) if self.trade_record[i] == -1 ]		
+		short_x = [ x[i] for i in range(0, len(price_hist)) if trade_record[i] == -1]
+		short_action = [ price_hist[i] for i in range(0, len(price_hist)) if trade_record[i] ==  -1 ]		
 		ax.scatter(short_x, short_action, c = 'r' , marker = 'v',   s= 1.0, label = 's')		
 
 		for b in self.band:
