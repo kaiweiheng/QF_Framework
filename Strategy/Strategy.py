@@ -41,7 +41,7 @@ class Strategy(object):
 	def __init__(self, **args):
 		super(Strategy, self).__init__()
 		self.cash= args['init_balance']
-		self.position, self.position_value = dict(), dict()
+		self.position, self.position_avg_price, self.position_value = dict(), dict(), dict()
 		self.total_value_records = []
 
 		self.daily_price_hist = args['daily_price_hist']
