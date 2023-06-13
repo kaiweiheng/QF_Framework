@@ -56,7 +56,9 @@ class VIX_arbitrage(Strategy):
 
 		self.position = {self.ticker:0, self.ticker_of_another_product:0}
 		self.position_avg_price = {self.ticker:0, self.ticker_of_another_product:0}		
-		# self.long_position_value, self.short_position_value = {self.ticker:0, self.ticker_of_another_product:0}, {self.ticker:0, self.ticker_of_another_product:0}
+
+		self.integration = 0
+		self.integration_records = []
 		# Simple_Anlysis.plot_single_factor_graph( self.testing_price['date'].values, self.testing_price['diff'].values, "%s_%s"%(self.ticker, self.ticker_of_another_product) )
 		
 
@@ -68,72 +70,83 @@ class VIX_arbitrage(Strategy):
 		price_for_this_product = self.daily_price_hist[ self.daily_price_hist['date'] == date ]['c_%s'%(self.ticker)].values[0]
 		price_for_paired_product = self.daily_price_hist[ self.daily_price_hist['date'] == date ]['c_%s'%(self.ticker_of_another_product)].values[0]		
 		
+		self.integration += diff_of_the_day
+		self.integration_records.append(self.integration)
+
 		self.trade_record_for_paired_product.append([date, price_for_this_product, 0, self.ticker])
-		
-		# if diff < - 0.1, long the pair
+		quantity = 100
+
 		if diff_of_the_day < -0.1 and self.last_time_action != 1:
-			self.trade_record_for_paired_product[-1] = [date, price_for_this_product, 100, self.ticker]
+			self.trade_record_for_paired_product[-1] = [date, price_for_this_product, quantity, self.ticker]
 			
-			##############################################
-			#for long product, deduct cash, update average price for long, add long position 
-			self.trade_record.append([date, price_for_this_product, 100, self.ticker])
-			self.cash = self.cash - 100 * price_for_this_product  #cash will be deducted if no short position on, otherwise add from avg price
+			self.trade_record.append([date, price_for_this_product, quantity, self.ticker])
+			#deduct margine if adding or no position, if close position return margine and calculate pnl 
+			self.cash = self.cash - quantity * price_for_this_product  if self.position[self.ticker] >= 0 else \
+			self.cash + quantity * self.position_avg_price[self.ticker] + quantity * (self.position_avg_price[self.ticker] - price_for_this_product)
 
 			total_value_tmp = self.position_avg_price[self.ticker] * self.position[self.ticker]
-			self.position_avg_price[self.ticker] = 0 if self.position[self.ticker] + 100 == 0 else  (total_value_tmp + 100*price_for_this_product)/( self.position[self.ticker]+ 100)
+			self.position_avg_price[self.ticker] = 0 if self.position[self.ticker] + quantity == 0 else \
+			(total_value_tmp + quantity*price_for_this_product)/( self.position[self.ticker] + quantity)
 			
-			self.position[self.ticker] += 100 
-			##############################################			
+			self.position[self.ticker] += quantity 
 
-			#for short position, deduct cash as margine, update average price for short, adding short position
-			self.trade_record.append([date, price_for_paired_product, -100, self.ticker_of_another_product])			
-			self.cash = self.cash + 100 * price_for_paired_product
+
+			self.trade_record.append([date, price_for_paired_product, -quantity, self.ticker_of_another_product])			
+			#deduct margine if adding or no position, if close position return margine and calculate pnl
+			self.cash = self.cash - quantity * price_for_paired_product if self.position[self.ticker_of_another_product] <= 0 else \
+			self.cash + quantity * self.position_avg_price[self.ticker_of_another_product] + quantity * (price_for_paired_product - self.position_avg_price[self.ticker_of_another_product])
 			
 			total_value_tmp = self.position_avg_price[self.ticker_of_another_product] * self.position[self.ticker_of_another_product]
-			# self.position_avg_price[self.ticker_of_another_product] = (total_value_tmp - 100*price_for_paired_product)/( self.position[self.ticker_of_another_product] -100  )
-			self.position_avg_price[self.ticker_of_another_product] = 0 if self.position[self.ticker_of_another_product] - 100 == 0 else  (total_value_tmp - 100*price_for_paired_product)/( self.position[self.ticker_of_another_product] -100  )
+			self.position_avg_price[self.ticker_of_another_product] = 0 if self.position[self.ticker_of_another_product] - quantity == 0 else\
+			(total_value_tmp - quantity*price_for_paired_product)/( self.position[self.ticker_of_another_product] - quantity  )
 			
-			##############################################
-			self.position[self.ticker_of_another_product] -= 100  
+			self.position[self.ticker_of_another_product] -= quantity  
+			
 			self.have_trigged_trade += 1
 			self.last_time_action = 1
-		# else if diff > 0.2 short the pair
-		# elif diff_of_the_day > 0.1 and self.last_time_action != -1:
-		elif diff_of_the_day > 0 and self.last_time_action == 1: # close long deal condition to be tried with integration of return changed, not only return
-			self.trade_record_for_paired_product[-1] = [date, price_for_this_product, -100, self.ticker]			
+
+		elif diff_of_the_day > 0 and self.last_time_action == 1: 
+			self.trade_record_for_paired_product[-1] = [date, price_for_this_product, -quantity, self.ticker]			
 			
-			##############################################
-			#close long order, add cash, update average price, deduct long position
-			self.trade_record.append([date, price_for_this_product, -100, self.ticker])
-			self.cash = self.cash + 100 * price_for_this_product
+			self.trade_record.append([date, price_for_this_product, -quantity, self.ticker])
+			#deduct margine if adding or no position, if close position return margine and calculate pnl
+			self.cash = self.cash - quantity * price_for_this_product if self.position[self.ticker] <= 0 else \
+			self.cash + quantity * self.position_avg_price[self.ticker] + quantity * (price_for_this_product - self.position_avg_price[self.ticker])
 
 			total_value_tmp = self.position_avg_price[self.ticker] * self.position[self.ticker]
-			self.position_avg_price[self.ticker] = 0 if self.position[self.ticker] - 100 == 0 else (total_value_tmp - 100*price_for_this_product)/( self.position[self.ticker] - 100)
+			self.position_avg_price[self.ticker] = 0 if self.position[self.ticker] - quantity == 0 else\
+			(total_value_tmp - quantity*price_for_this_product)/( self.position[self.ticker] - quantity)
 
-			self.position[self.ticker] -= 100 
-			##############################################
-			self.trade_record.append([date, price_for_paired_product, 100, self.ticker_of_another_product])			
-			self.cash = self.cash - 100 * price_for_paired_product
+			self.position[self.ticker] -= quantity 
+
+			self.trade_record.append([date, price_for_paired_product, quantity, self.ticker_of_another_product])			
+			#deduct margine if adding or no position, if close position return margine and calculate pnl
+			self.cash = self.cash - quantity  * price_for_paired_product if self.position[self.ticker_of_another_product] >= 0 else \
+			self.cash + quantity * self.position_avg_price[self.ticker_of_another_product] + quantity * (self.position_avg_price[self.ticker_of_another_product] - price_for_paired_product)
+
 
 			total_value_tmp = self.position_avg_price[self.ticker_of_another_product] * self.position[self.ticker_of_another_product]
-			self.position_avg_price[self.ticker_of_another_product] = 0 if self.position[self.ticker_of_another_product] + 100 == 0 else (total_value_tmp + 100*price_for_paired_product)/( self.position[self.ticker_of_another_product] + 100  )
+			self.position_avg_price[self.ticker_of_another_product] = 0 if self.position[self.ticker_of_another_product] + quantity == 0 else \
+			(total_value_tmp + quantity*price_for_paired_product)/( self.position[self.ticker_of_another_product] + quantity  )
 
-			self.position[self.ticker_of_another_product] += 100
+			self.position[self.ticker_of_another_product] += quantity
 
 			self.have_trigged_trade += 1
 			self.last_time_action = -1
 
 
-		print(" %s  %s %s %s %s %s %s\n"%(date, self.ticker, self.position[self.ticker] ,self.position_avg_price[self.ticker] , 
-			self.ticker_of_another_product, self.position[self.ticker_of_another_product], self.position_avg_price[self.ticker_of_another_product]))
+		self.position_value[self.ticker] = abs(self.position[self.ticker] * self.position_avg_price[self.ticker])+\
+		self.position[self.ticker] * (price_for_this_product - self.position_avg_price[self.ticker]) 
+
+		self.position_value[self.ticker_of_another_product] = abs(self.position[self.ticker_of_another_product] * self.position_avg_price[self.ticker_of_another_product]) +\
+		self.position[self.ticker_of_another_product] * (price_for_paired_product - self.position_avg_price[self.ticker_of_another_product]) 
 
 
-		self.position_value[self.ticker] = self.position[self.ticker] * price_for_this_product
-		self.position_value[self.ticker_of_another_product] = self.position[self.ticker_of_another_product] * price_for_paired_product
+		# print(" %s %s, %s %s %s %s %s, %s %s %s %s %s\n"%(date, self.cash, self.ticker, self.position[self.ticker] , price_for_this_product ,self.position_value[self.ticker], self.position_avg_price[self.ticker] , 
+		# 	self.ticker_of_another_product, self.position[self.ticker_of_another_product], price_for_paired_product ,self.position_value[self.ticker_of_another_product], self.position_avg_price[self.ticker_of_another_product] ))
 
-
-		self.total_value_records.append( self.cash + self.position_value[self.ticker] + self.position_value[self.ticker_of_another_product]  )
-		return 0
+		self.total_value_records.append( self.cash + abs(self.position_value[self.ticker]) + abs(self.position_value[self.ticker_of_another_product])  )
+		# return 0
 
 	@staticmethod
 	def get_product_pairs(product_list):

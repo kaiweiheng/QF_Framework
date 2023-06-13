@@ -89,7 +89,10 @@ class Portfolio(object):
 
 			trade_record = trade_record['quantity'].values
 			# Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.testing_price['diff'].values, "%s_%s"%(obj.ticker, obj.ticker_of_another_product), trade_record)
+			
 			Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.total_value_records, "%s_%s"%(obj.ticker, obj.ticker_of_another_product), trade_record)			
+			Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.integration_records, "%s_%s_integration"%(obj.ticker, obj.ticker_of_another_product), trade_record)						
+
 			#check the distribution of training, validation and sim, to varifify patterns are consistant all crossing the time
 
 			#pick the top 5% diff in training see the effectiveness, with trading cost
