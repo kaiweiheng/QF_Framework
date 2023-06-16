@@ -78,20 +78,35 @@ class Portfolio(object):
 			# training_dates, _ = obj.get_training_val_date()
 
 			print("init_cash = %s \n" %(obj.cash))
-			for date in obj.sim_dates:
-				obj.determin_action_of_a_day(date)
+
+			quantiles =  obj.training_price['diff'].quantile([.1, .5]).values
+			lower_quantile, higher_quantile = quantiles[0], quantiles[1]
+
+			# for date in obj.sim_dates:
+				# obj.determin_action_of_a_day(date)
+				# obj.determin_action_of_a_day(date, lower_quantile, higher_quantile)
+			
+			for date in obj.validation_dates:
+			# 	obj.determin_action_of_a_day(date)
+				obj.determin_action_of_a_day(date, lower_quantile, higher_quantile)
+
 
 			trade_record =  pd.DataFrame(obj.trade_record_for_paired_product,columns=['date', 'price', 'quantity','ticker']) 
-			print("%s_%s traded %s %s %s \n"%(obj.ticker, obj.ticker_of_another_product , obj.have_trigged_trade, trade_record['quantity'].sum(), obj.total_value_records[-1] ) )
+			print("%s_%s traded %s %s %s \n lower %.3f higher %.3f\n"%(obj.ticker, obj.ticker_of_another_product , obj.have_trigged_trade, 
+				trade_record['quantity'].sum(), obj.total_value_records[-1], lower_quantile, higher_quantile ) )
 
 
 			# print(pd.DataFrame(obj.trade_record,columns=['date', 'price', 'quantity','ticker']))
 
 			trade_record = trade_record['quantity'].values
-			# Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.testing_price['diff'].values, "%s_%s"%(obj.ticker, obj.ticker_of_another_product), trade_record)
+
+			Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.validation_price['diff'].values, "%s_%s_diff"%(obj.ticker, obj.ticker_of_another_product), trade_record)
+			Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.total_value_records, "%s_%s"%(obj.ticker, obj.ticker_of_another_product), trade_record)			
+			Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.integration_records, "%s_%s_integration"%(obj.ticker, obj.ticker_of_another_product), trade_record)		
 			
-			Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.total_value_records, "%s_%s"%(obj.ticker, obj.ticker_of_another_product), trade_record)			
-			Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.integration_records, "%s_%s_integration"%(obj.ticker, obj.ticker_of_another_product), trade_record)						
+			# Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.testing_price['diff'].values, "%s_%s_diff"%(obj.ticker, obj.ticker_of_another_product), trade_record)
+			# Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.total_value_records, "%s_%s"%(obj.ticker, obj.ticker_of_another_product), trade_record)			
+			# Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.integration_records, "%s_%s_integration"%(obj.ticker, obj.ticker_of_another_product), trade_record)						
 
 			#check the distribution of training, validation and sim, to varifify patterns are consistant all crossing the time
 

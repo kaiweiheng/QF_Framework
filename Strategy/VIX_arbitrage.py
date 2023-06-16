@@ -37,6 +37,7 @@ class VIX_arbitrage(Strategy):
 		self.daily_price_hist = self.daily_price_hist.dropna(subset = ['diff'])
 
 		print("%s %s \n"%(self.ticker, self.ticker_of_another_product))
+		print( self.daily_price_hist[['re_%s'%(self.ticker),'re_%s'%(self.ticker_of_another_product)]].corr() )
 		# print(self.daily_price_hist.describe())
 
 		self.training_dates, self.validation_dates = self.get_training_val_date()
@@ -57,26 +58,27 @@ class VIX_arbitrage(Strategy):
 		self.position = {self.ticker:0, self.ticker_of_another_product:0}
 		self.position_avg_price = {self.ticker:0, self.ticker_of_another_product:0}		
 
-		self.integration = 0
+		self.integration = 1
 		self.integration_records = []
+		self.integration_tmp = 1
 		# Simple_Anlysis.plot_single_factor_graph( self.testing_price['date'].values, self.testing_price['diff'].values, "%s_%s"%(self.ticker, self.ticker_of_another_product) )
 		
 
 
-	def determin_action_of_a_day(self, date):
+	def determin_action_of_a_day(self, date, lower_quantile = -0.1, higher_quantile = 0):
 
 		# get the diff of the date
 		diff_of_the_day = self.daily_price_hist[ self.daily_price_hist['date'] == date ]['diff'].values[0]
 		price_for_this_product = self.daily_price_hist[ self.daily_price_hist['date'] == date ]['c_%s'%(self.ticker)].values[0]
 		price_for_paired_product = self.daily_price_hist[ self.daily_price_hist['date'] == date ]['c_%s'%(self.ticker_of_another_product)].values[0]		
 		
-		self.integration += diff_of_the_day
+		self.integration = self.integration * (1 + diff_of_the_day)
 		self.integration_records.append(self.integration)
 
 		self.trade_record_for_paired_product.append([date, price_for_this_product, 0, self.ticker])
 		quantity = 100
 
-		if diff_of_the_day < -0.1 and self.last_time_action != 1:
+		if diff_of_the_day < lower_quantile and self.last_time_action != 1:
 			self.trade_record_for_paired_product[-1] = [date, price_for_this_product, quantity, self.ticker]
 			
 			self.trade_record.append([date, price_for_this_product, quantity, self.ticker])
@@ -105,7 +107,15 @@ class VIX_arbitrage(Strategy):
 			self.have_trigged_trade += 1
 			self.last_time_action = 1
 
-		elif diff_of_the_day > 0 and self.last_time_action == 1: 
+			self.integration = 1 * (1 + diff_of_the_day)
+			# self.integration
+			self.integration_records[-1] = self.integration
+			self.integration_tmp = (self.integration + 1) / 2
+
+		# elif diff_of_the_day > higher_quantile and self.last_time_action == 1: 
+		#or considering stop profit in 50 bps or 100 bps
+		elif self.integration > 1 and self.last_time_action == 1:
+	
 			self.trade_record_for_paired_product[-1] = [date, price_for_this_product, -quantity, self.ticker]			
 			
 			self.trade_record.append([date, price_for_this_product, -quantity, self.ticker])
@@ -133,6 +143,9 @@ class VIX_arbitrage(Strategy):
 
 			self.have_trigged_trade += 1
 			self.last_time_action = -1
+
+			# self.integration = 1
+			# self.integration_records[-1] = diff_of_the_day
 
 
 		self.position_value[self.ticker] = abs(self.position[self.ticker] * self.position_avg_price[self.ticker])+\
