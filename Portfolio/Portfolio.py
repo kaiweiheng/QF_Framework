@@ -92,17 +92,16 @@ class Portfolio(object):
 
 
 			trade_record =  pd.DataFrame(obj.trade_record_for_paired_product,columns=['date', 'price', 'quantity','ticker']) 
-			print("%s_%s traded %s %s %s \n lower %.3f higher %.3f\n"%(obj.ticker, obj.ticker_of_another_product , obj.have_trigged_trade, 
-				trade_record['quantity'].sum(), obj.total_value_records[-1], lower_quantile, higher_quantile ) )
+			print("%s_%s traded %s, end value %s \n lower %.3f higher %.3f\n"%(obj.ticker, obj.ticker_of_another_product , obj.have_trigged_trade 
+				, obj.total_value_records[-1], lower_quantile, higher_quantile ) )
 
 
-			# print(pd.DataFrame(obj.trade_record,columns=['date', 'price', 'quantity','ticker']))
 
 			trade_record = trade_record['quantity'].values
+			Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.total_value_records, "%s_%s"%(obj.ticker, obj.ticker_of_another_product), trade_record)		
 
-			Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.validation_price['diff'].values, "%s_%s_diff"%(obj.ticker, obj.ticker_of_another_product), trade_record)
-			Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.total_value_records, "%s_%s"%(obj.ticker, obj.ticker_of_another_product), trade_record)			
-			Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.integration_records, "%s_%s_integration"%(obj.ticker, obj.ticker_of_another_product), trade_record)		
+			# Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.validation_price['diff'].values, "%s_%s_diff"%(obj.ticker, obj.ticker_of_another_product), trade_record)
+			# Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.integration_records, "%s_%s_integration"%(obj.ticker, obj.ticker_of_another_product), trade_record)		
 			
 			# Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.testing_price['diff'].values, "%s_%s_diff"%(obj.ticker, obj.ticker_of_another_product), trade_record)
 			# Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.total_value_records, "%s_%s"%(obj.ticker, obj.ticker_of_another_product), trade_record)			

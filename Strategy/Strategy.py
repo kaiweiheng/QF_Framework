@@ -23,6 +23,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
+from Order import *
+
 
 class Strategy(object):
 	"""
@@ -41,7 +43,8 @@ class Strategy(object):
 	def __init__(self, **args):
 		super(Strategy, self).__init__()
 		self.cash= args['init_balance']
-		self.position, self.position_avg_price, self.position_value = dict(), dict(), dict()
+
+		self.position, self.position_avg_price = dict(), dict()
 		self.total_value_records = []
 
 		self.daily_price_hist = args['daily_price_hist']
@@ -50,19 +53,109 @@ class Strategy(object):
 		self.sim_start_date = args['sim_start_date']
 
 		self.ticker = args['ticker']
-		# self.trade_record = pd.DataFrame(columns=['date', 'price', 'quantity','product_ticker'])
-		self.trade_record = []
+
+		# Order(date = date , ticker = self.ticker, price = price_for_this_product, quantity = quantity)
+		self.trade_record, self.trade_record_already_processed = [], []
 
 		self.have_trigged_trade = 0
 
 		self.last_time_action = 0 # 0 for init, -1 for short and 1 for long
+
+		# self.position, self.position_avg_price = {}, {}
+		# self.cash = args['init_balance']
 		print("%s, start %s , end %s total %s records \n"%(self.ticker, self.data_start_date, self.data_end_date, len(self.daily_price_hist)))
 
-		# logging.info("%s created \n"%(self.ticker))
 
 	def determin_action_of_a_day(self):
 		raise NotImplementedError()
 
+	def get_trade_records_for_a_day(self, date):
+		#selecting trading records in that date by iterating trading records
+		trading_records_of_a_day = []
+		for record in self.trade_record:
+			if record.date == date:
+				trading_records_of_a_day.append(record)
+				self.trade_record_already_processed.append(record)
+		self.trade_record = []
+		return trading_records_of_a_day
+
+	def determin_position_of_a_day(self, date, comission = 1):
+		trading_records_of_a_day = self.get_trade_records_for_a_day(date)
+
+		#for each each product, update it's quantity and avg price after making deals at that date
+		for record in trading_records_of_a_day:
+			price, quantity, ticker= record.price, record.quantity, record.ticker 
+			if ticker not in self.position.keys():
+				quantity_before_action = 0
+				avg_price_before_actiion = 0
+
+				self.position[ ticker ] = quantity
+				self.position_avg_price[ ticker ] = price
+
+			else:
+				quantity_before_action = self.position[ ticker ]
+				avg_price_before_actiion = self.position_avg_price[ ticker ]
+				
+				self.position[ ticker ] += quantity
+				self.position_avg_price[ ticker ] = 0 if self.position[ ticker ] == 0 else\
+				(quantity_before_action * avg_price_before_actiion + price * quantity ) / (self.position[ ticker ])
+
+			#entry or adding position in the same direction
+			if (quantity_before_action <= 0 and quantity < 0) or (quantity_before_action >= 0 and quantity > 0):
+				self.cash = self.cash - abs(price * quantity) # - Strategy.determine_commission(quantity) 
+			else: 
+				#to close position in the opposite direction to the existed,
+				#updated cash = pervious cash + return margine + pnl
+				self.cash += self.determine_value_for_a_product_of_a_day(quantity, avg_price_before_actiion, price) 
+
+			if comission == 1:
+				self.cash -= Strategy.determine_commission(quantity)
+
+	def determine_pnl_related_of_a_product(self, ticker, price):
+		'''
+		method to define the pnl and rate for a product if close the deal now
+
+		return: pnl_rate, pnl, margine, comssion
+		'''
+		if ticker not in self.position.keys():
+			self.position[ticker], self.position_avg_price[ticker] = 0, 0
+
+		quantity, avg_price = -1 * self.position[ticker], self.position_avg_price[ticker]
+		product_pnl = self.determine_pnl_for_a_product_of_a_day(quantity = quantity, avg_price = avg_price, current_price = price)
+		product_value = self.determine_margine_for_a_product_of_a_day(quantity = quantity, avg_price = avg_price )
+		comission = self.determine_commission(quantity = quantity)
+		pnl_rate = 0 if product_value == 0 else (product_pnl - comission)/product_value
+
+		return pnl_rate , product_pnl - comission, product_value, comission
+
+	@staticmethod
+	def determine_commission(quantity):
+		# https://www.futuhk.com/commissionnew?lang=zh-hk
+		comission = max(0.99, quantity * 0.0049) + max(1.0, quantity * 0.005) + 0.003 * quantity 
+		if quantity < 0:
+			comission  = comission + 0.000008 * quantity + min( 7.27, max(0.01, 0.000145 * quantity) )
+		return comission 
+
+	@staticmethod
+	def determine_pnl_for_a_product_of_a_day(quantity, avg_price, current_price, comission = 1):
+		pnl = quantity * (avg_price - current_price)
+		if comission == 1:
+			pnl -= Strategy.determine_commission(quantity)
+		return pnl
+
+	@staticmethod
+	def determine_margine_for_a_product_of_a_day(quantity, avg_price):
+		return abs(quantity * avg_price)
+
+
+	@staticmethod
+	def determine_value_for_a_product_of_a_day(quantity, avg_price, current_price, comission = 1):
+		'''
+		if close position quantity should be quantity traded at that date
+		else generally enquiry pnl, quantity should be all the -1 * quantity holding in hand (close position at once)
+		'''
+		# return abs(quantity * avg_price) + quantity * (avg_price - current_price)
+		return Strategy.determine_margine_for_a_product_of_a_day(quantity, avg_price) + Strategy.determine_pnl_for_a_product_of_a_day(quantity, avg_price, current_price, comission)	
 
 	def get_sim_dates(self, limit_num_of_dates = None):
 		if type(limit_num_of_dates) == int:
@@ -74,14 +167,6 @@ class Strategy(object):
 		val_dates = training_dates[int(split_portion * len(training_dates) ):  ]
 		training_dates = training_dates[: int(split_portion * len(training_dates) )]
 		return training_dates, val_dates
-
-	def determine_position_of_a_day(self):
-
-		return 0
-
-	def convert_trade_record_to_dataframe(self):
-		return pd.DataFrame(self.trade_record,columns=['date', 'price', 'quantity','ticker'])
-
 
 	def plot_trade_graph(self, date, price_hist):
 		plt.rcParams['font.size'] = 7		
@@ -104,7 +189,6 @@ class Strategy(object):
 		plt.close(fig) #not showing in the jupyter lab
 		fig.savefig(output_path, dpi = 250)
 
-		return 0
 
 	@staticmethod
 	def check_parents_dir_exist(path):

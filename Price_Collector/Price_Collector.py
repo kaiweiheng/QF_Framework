@@ -19,13 +19,3 @@ class Price_Collector(object):
 		if not os.path.exists(parents_dir):
 			os.makedirs(parents_dir)
 
-	@staticmethod
-	def calculate_return(price, return_column = 'c' , base_column = 'c'):
-		'''
-		to calculate return with close of last time priod 
-		'''
-		price['base_last_period'] = price[base_column].shift(1)
-		price['re'] = ( price[ return_column ].astype('float') - price['base_last_period'].astype('float') ) / price['base_last_period'].astype('float')
-		return price['re'].values
-
-

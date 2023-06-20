@@ -33,12 +33,8 @@ class obb_Price_Collector(Price_Collector):
 				print("no price data for %s between %s and %s\n"%(ticker, start_date, end_date))
 			daily_price = Price_Collector.read_csv_if_exist(path)
 
-		# print(type(daily_price['date'].values[0]))
-
 		daily_price['date'] = pd.to_datetime(daily_price['date'], format='%Y-%m-%d') 
 		
-		# daily_price = daily_price[ daily_price['date'] > '2015-01-01' ]
-		# print(type(daily_price['date'].values[0]))
 		return daily_price
 
 
