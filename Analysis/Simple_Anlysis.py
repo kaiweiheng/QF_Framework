@@ -1,5 +1,7 @@
 import os
+import xlsxwriter
 from Strategy import *
+from datetime import date
 import matplotlib.pyplot as plt
 
 class Simple_Anlysis(object):
@@ -29,21 +31,19 @@ class Simple_Anlysis(object):
 
 
 	@staticmethod
-	def plot_single_factor_graph(date, price_hist, ticker):
+	def plot_single_factor_graph(date, price_hist, ticker, if_save = False):
 		plt.rcParams['font.size'] = 7		
 		output_path = os.path.join('data','output',"%s.png"%(ticker))
 		Strategy.check_parents_dir_exist(output_path)
 
-		# x = [datetime.datetime.strptime(d, "%Y-%m-%d").date() for d in date]
-		x = date
-		y = price_hist
+		x, y = date, price_hist
 
 		fig, ax = plt.subplots()
 		fig.set_figheight(8)
-		fig.set_figwidth(int(len(date))/5)
-		ax.plot(x, y, 'w', linewidth=0.25, label="c")
+		fig.set_figwidth(int(len(date))/10)
+		ax.plot(x, y, 'w', linewidth=0.25)
 
-		ax.set(xlabel='time', ylabel='Price', title='%s Trade Record'%(ticker))
+		ax.set(xlabel='time', ylabel='y1', title='%s Trade Record'%(ticker))
 		ax.grid(color = 'w')
 		
 		ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
@@ -52,24 +52,67 @@ class Simple_Anlysis(object):
 		ax.tick_params(axis='x', labelrotation=45, labelsize=5)
 
 		plt.close(fig) #not showing in the jupyter lab
+
+		if if_save:
+			fig.savefig(output_path, dpi = 250)
+
+		return ax, fig
+
+	@staticmethod
+	def plot_two_factors_graph(date, y1, y2, ticker, if_save = False):
+		output_path = os.path.join('data','output',"%s.png"%(ticker))
+		Strategy.check_parents_dir_exist(output_path)
+
+		ax, fig = Simple_Anlysis.plot_single_factor_graph(date = date, price_hist = y1, ticker = ticker)
+		color = 'c'
+		x = date
+		ax2 = ax.twinx()
+		ax2.set_ylabel('y2')
+		ax2.plot(date, y2, linewidth=0.25, color = color)
+		ax2.tick_params(axis = 'y')
+		ax2.grid(color = color)
+		fig.tight_layout()
+		plt.close(fig) #not showing in the jupyter lab
+
+		if if_save:
+			fig.savefig(output_path, dpi = 250)		
+
+		return ax, ax2, fig
+
+
+
+	@staticmethod
+	def plot_trade_and_diff_graph(date, price_hist, diff, ticker, trade_hist):
+		output_path = os.path.join('data','output',"%s.png"%(ticker))
+		Strategy.check_parents_dir_exist(output_path)
+
+		ax, ax2, fig = Simple_Anlysis.plot_two_factors_graph(date = date, y1 = price_hist, y2 = diff, ticker = ticker)
+	
+		x , y = date , price_hist
+
+		long_x = [ x[i] for i in range(0, len(price_hist)) if trade_hist[i] > 0 ]
+		long_action = [ price_hist[i] for i in range(0, len(price_hist)) if trade_hist[i] > 0 ]
+		ax.scatter(long_x, long_action, c = 'g', marker = '^',   s= 2.0, label = 'l')
+		# ax2.scatter(long_x, long_action, c = 'g', marker = '^',   s= 2.0, label = 'l')		
+
+		short_x = [ x[i] for i in range(0, len(price_hist)) if trade_hist[i] < 0]
+		short_action = [ price_hist[i] for i in range(0, len(price_hist)) if trade_hist[i] < 0 ]		
+		ax.scatter(short_x, short_action, c = 'r' , marker = 'v',   s= 2.0, label = 's')
+		# ax2.scatter(short_x, short_action, c = 'r' , marker = 'v',   s= 2.0, label = 's')
+
+		plt.close(fig) #not showing in the jupyter lab
 		fig.savefig(output_path, dpi = 250)
+
 
 
 	@staticmethod
 	def plot_trade_graph(date, price_hist, ticker, trade_hist):
-		plt.rcParams['font.size'] = 7		
 		output_path = os.path.join('data','output',"%s.png"%(ticker))
 		Strategy.check_parents_dir_exist(output_path)
 
-		# x = [datetime.datetime.strptime(d, "%Y-%m-%d").date() for d in date]
-		x = date
-		y = price_hist
-
-		fig, ax = plt.subplots()
-		fig.set_figheight(8)
-		fig.set_figwidth(int(len(date))/5)
-		ax.plot(x, y, 'w', linewidth=0.25, label="c")
-
+		ax, fig = Simple_Anlysis.plot_single_factor_graph(date = date, price_hist = price_hist, ticker = ticker)
+	
+		x , y = date , price_hist
 
 		long_x = [ x[i] for i in range(0, len(price_hist)) if trade_hist[i] > 0 ]
 		long_action = [ price_hist[i] for i in range(0, len(price_hist)) if trade_hist[i] > 0 ]
@@ -79,14 +122,19 @@ class Simple_Anlysis(object):
 		short_action = [ price_hist[i] for i in range(0, len(price_hist)) if trade_hist[i] < 0 ]		
 		ax.scatter(short_x, short_action, c = 'r' , marker = 'v',   s= 2.0, label = 's')
 
-
-		ax.set(xlabel='time', ylabel='Price', title='%s Trade Record'%(ticker))
-		ax.grid(color = 'w')
-		
-		ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-		# ax.xaxis.set_major_locator(mdates.DayLocator(interval=int(  len(date)/10 )))
-		ax.xaxis.set_major_locator(mdates.DayLocator(interval=int(5)))
-		ax.tick_params(axis='x', labelrotation=45, labelsize=5)
-
 		plt.close(fig) #not showing in the jupyter lab
 		fig.savefig(output_path, dpi = 250)
+
+
+	@staticmethod
+	def calculate_cumulated_return():
+		return 0
+
+	@staticmethod
+	def calculate_annualised_return():
+		return 0
+
+
+	@staticmethod
+	def calculate_beta():
+		return 0

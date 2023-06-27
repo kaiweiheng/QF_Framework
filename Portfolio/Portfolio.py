@@ -9,6 +9,10 @@ sys.path.append("Strategy")
 from Grid_Trade import *
 from VIX_arbitrage import *
 
+
+
+
+
 class Portfolio(object):
 	"""
 	Portfolio
@@ -53,68 +57,68 @@ class Portfolio(object):
 
 		num_of_sim_date = 200 #for debug hardcode, to let graph easier to look
 
-		daily_price = dict()
+		self.daily_price = dict()
 		#init strategy with data retrived
 		for ticker in self.holding_list:
 
-			daily_price[ticker] = obb_Price_Collector.get_price_for_a_stock(ticker, start_date = self.data_start_date)		
+			self.daily_price[ticker] = obb_Price_Collector.get_price_for_a_stock(ticker, start_date = self.data_start_date)		
 			#to init your strategy for every product
 
+		self.run_sim_at_a_data_set(data_set = 'training_price', plot_diff = True, plot_pnl = True)	
 
-			# self.strategy_obj_list.append(
-			# 	Grid_Trade( init_balance = self.total_balance/len(self.holding_list), daily_price_hist = daily_price, ticker = ticker, sim_start_date = daily_price['date'].values[0],
-			# 	n_band_one_side = 5, band_interval = 0.025 ) )			
+		self.run_sim_at_a_data_set(data_set = 'validation_price', plot_diff = True, plot_pnl = True)		
 
+		self.run_sim_at_a_data_set(data_set = 'testing_price', plot_diff = True, plot_pnl = True)					
+		
 
+	def run_sim_at_a_data_set(self, data_set, plot_diff = False, plot_pnl = False):
+
+		self.strategy_obj_list = []
 		product_pairs = VIX_arbitrage.get_product_pairs(self.holding_list)
 		for pairs in product_pairs:
 			product_a_ticker , product_b_ticker = pairs[0], pairs[1]
 			self.strategy_obj_list.append(  
-				VIX_arbitrage(init_balance = 10000 , daily_price_hist = daily_price[product_a_ticker], ticker = product_a_ticker, sim_start_date = self.sim_start_date,
-				VIX_his = self.indices_value_dict['^VVIX'], daily_price_of_another_product = daily_price[product_b_ticker] , ticker_of_another_product = product_b_ticker ))
+				VIX_arbitrage(init_balance = 10000 , daily_price_hist = self.daily_price[product_a_ticker], ticker = product_a_ticker, sim_start_date = self.sim_start_date,
+				VIX_his = self.indices_value_dict['^VVIX'], daily_price_of_another_product = self.daily_price[product_b_ticker] , ticker_of_another_product = product_b_ticker ))		
 
-		#optimized hyperparameter by using data >= data_date and > sim_date TBD
+		aggregated_trading_record = []
 		for obj in self.strategy_obj_list:
-			# training_dates, _ = obj.get_training_val_date()
-
-			print("init_cash = %s \n" %(obj.cash))
 
 			quantiles =  obj.training_price['diff'].quantile([.1, .5]).values
 			lower_quantile, higher_quantile = quantiles[0], quantiles[1]
 
-			# for date in obj.sim_dates:
-				# obj.determin_action_of_a_day(date)
-				# obj.determin_action_of_a_day(date, lower_quantile, higher_quantile)
-			
-			for date in obj.validation_dates:
-			# 	obj.determin_action_of_a_day(date)
+			for date in getattr(obj, data_set)['date'].values:
+			# for date in obj.training_dates:
 				obj.determin_action_of_a_day(date, lower_quantile, higher_quantile)
 
-
 			trade_record =  pd.DataFrame(obj.trade_record_for_paired_product,columns=['date', 'price', 'quantity','ticker']) 
-			print("%s_%s traded %s, end value %s \n lower %.3f higher %.3f\n"%(obj.ticker, obj.ticker_of_another_product , obj.have_trigged_trade 
-				, obj.total_value_records[-1], lower_quantile, higher_quantile ) )
+			print("%s_%s %s traded %s, end value %s \n lower %.3f higher %.3f\n"%(obj.ticker, obj.ticker_of_another_product , data_set , obj.have_trigged_trade 
+				, obj.total_value_records[-1], lower_quantile, higher_quantile ) )		
 
-
+			for record in obj.trade_record_already_processed:
+				aggregated_trading_record.append(record.to_DataFrame())
 
 			trade_record = trade_record['quantity'].values
-			Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.total_value_records, "%s_%s"%(obj.ticker, obj.ticker_of_another_product), trade_record)		
 
-			# Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.validation_price['diff'].values, "%s_%s_diff"%(obj.ticker, obj.ticker_of_another_product), trade_record)
-			# Simple_Anlysis.plot_trade_graph( obj.validation_price['date'].values, obj.integration_records, "%s_%s_integration"%(obj.ticker, obj.ticker_of_another_product), trade_record)		
+
+			# Simple_Anlysis.plot_two_factors_graph( getattr(obj, data_set)['date'].values, 
+			# 	obj.total_value_records, getattr(obj, data_set)['diff'].values, 
+			# 	"%s_%s_%s"%(obj.ticker, obj.ticker_of_another_product, data_set) )
+			Simple_Anlysis.plot_trade_and_diff_graph( getattr(obj, data_set)['date'].values, 
+				obj.total_value_records, getattr(obj, data_set)['diff'].values, 
+				"%s_%s_%s"%(obj.ticker, obj.ticker_of_another_product, data_set), trade_record )			
+
+			# if plot_diff:
+			# 	Simple_Anlysis.plot_trade_graph( getattr(obj, data_set)['date'].values, getattr(obj, data_set)['diff'].values, "%s_%s_%s_diff"%(obj.ticker, obj.ticker_of_another_product, data_set), trade_record)
 			
-			# Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.testing_price['diff'].values, "%s_%s_diff"%(obj.ticker, obj.ticker_of_another_product), trade_record)
-			# Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.total_value_records, "%s_%s"%(obj.ticker, obj.ticker_of_another_product), trade_record)			
-			# Simple_Anlysis.plot_trade_graph( obj.testing_price['date'].values, obj.integration_records, "%s_%s_integration"%(obj.ticker, obj.ticker_of_another_product), trade_record)						
+			# if plot_pnl:
+			# 	Simple_Anlysis.plot_trade_graph( getattr(obj, data_set)['date'].values, obj.total_value_records, "%s_%s_%s"%(obj.ticker, obj.ticker_of_another_product, data_set), trade_record)		
 
-			#check the distribution of training, validation and sim, to varifify patterns are consistant all crossing the time
+		# aggregated_trading_record = pd.concat(aggregated_trading_record)
+		# aggregated_trading_record.to_csv(os.path.join('data','output','total_trade_record.csv'), index=False)
 
-			#pick the top 5% diff in training see the effectiveness, with trading cost
 
-			#proporgate to validation set, and come up with diff margine see if it is profitable
-
-			# print(len(training_dates))	
-
+		return 0
 
 
 		'''

@@ -34,6 +34,7 @@ class VIX_arbitrage(Strategy):
 		self.daily_price_hist = pd.merge(self.daily_price_hist, self.daily_price_of_another_product, how = 'inner', left_on = 'date', right_on = 'date')
 
 		self.daily_price_hist['diff'] = self.daily_price_hist['re_%s'%(self.ticker)] - self.daily_price_hist['re_%s'%(self.ticker_of_another_product)]
+
 		self.daily_price_hist = self.daily_price_hist.dropna(subset = ['diff'])
 
 
@@ -44,15 +45,40 @@ class VIX_arbitrage(Strategy):
 		self.validation_price = self.select_rows_according_to_dates(self.daily_price_hist, self.validation_dates[0], self.validation_dates[-1])
 		self.testing_price = self.select_rows_according_to_dates(self.daily_price_hist, self.sim_dates[0], self.sim_dates[-1])				
 
+		# print(self.training_price[['re_%s'%(self.ticker), 're_%s'%(self.ticker_of_another_product) ]].corr() )
+		# print("   ")
+		# print(self.validation_price[['re_%s'%(self.ticker), 're_%s'%(self.ticker_of_another_product) ]].corr() )
+		# print("   ")		
+		# print(self.daily_price_hist[['re_%s'%(self.ticker), 're_%s'%(self.ticker_of_another_product) ]].corr() )
+
+		# nag, nag_record = 0, []
+		# pos, pos_record = 0, []
+		# for d in self.training_price['diff'].values:
+		# 	if d < 0:
+		# 		nag += 1
+
+		# 		pos_record.append(pos)
+		# 		pos = 0
+
+		# 	elif d> 0:
+		# 		pos += 1
+
+		# 		nag_record.append(nag)
+		# 		nag = 0
+
+		# print(len(nag_record))
+		# print(len(pos_record))		
+		# print("%s_%s max nag days %s max pos days %s \n"%(self.ticker, self.ticker_of_another_product, np.mean(nag_record), np.mean(pos_record) ))
 
 		self.trade_record_for_paired_product = []
-
-		# Simple_Anlysis.return_histogram([self.training_price['diff'].values, self.validation_price['diff'].values, self.testing_price['diff'].values], ['train','val','testing'],
-		# 	"%s_%s"%(self.ticker, self.ticker_of_another_product))
 
 
 		self.integration = 1
 		self.integration_records = []
+
+
+		# Simple_Anlysis.return_histogram([self.training_price['diff'].values, self.validation_price['diff'].values, self.testing_price['diff'].values], ['train','val','testing'],
+		# 	"%s_%s"%(self.ticker, self.ticker_of_another_product))
 
 		# Simple_Anlysis.plot_single_factor_graph( self.testing_price['date'].values, self.testing_price['diff'].values, "%s_%s"%(self.ticker, self.ticker_of_another_product) )
 		
@@ -82,6 +108,7 @@ class VIX_arbitrage(Strategy):
 
 		if diff_of_the_day < lower_quantile and self.last_time_action != 1:
 			quantity = max_quantity_to_open_paried_product
+
 			self.trade_record_for_paired_product[-1] = [date, price_for_this_product, quantity, self.ticker]
 
 			self.trade_record.append(Order(date = date , ticker = self.ticker, price = price_for_this_product, quantity = quantity))			
@@ -96,7 +123,7 @@ class VIX_arbitrage(Strategy):
 		#or considering stop profit in 50 bps or 100 bps
 		#to be define the optimal exist condition
 		# elif diff_of_the_day > higher_quantile and self.last_time_action == 1:
-		elif total_pnl_rate > 0.05 and self.last_time_action == 1:
+		elif total_pnl_rate > 0.005 and self.last_time_action == 1:
 		# elif self.integration > 1 and self.last_time_action == 1:	
 			quantity = max_quantity_to_close_paired_product
 			self.trade_record_for_paired_product[-1] = [date, price_for_this_product, -quantity, self.ticker]			

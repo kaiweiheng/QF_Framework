@@ -1,3 +1,4 @@
+import pandas as pd
 class Order(object):
 	"""docstring for Order"""
 	def __init__(self, date, ticker, price, quantity):
@@ -10,4 +11,6 @@ class Order(object):
 		self.ticker = ticker
 		self.price = price
 		self.quantity = quantity
-		
+	
+	def to_DataFrame(self):
+		return pd.DataFrame({ 'date': [self.date], 'ticker': [self.ticker], 'price':[self.price], 'quantity':[self.quantity] } )
