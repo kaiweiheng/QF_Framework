@@ -15,6 +15,7 @@
 #     datefmt='%Y-%m-%d %H:%M:%S')
 
 import os
+import sys
 import datetime
 import numpy as np
 np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning) 
@@ -168,27 +169,6 @@ class Strategy(object):
 		training_dates = training_dates[: int(split_portion * len(training_dates) )]
 		return training_dates, val_dates
 
-	def plot_trade_graph(self, date, price_hist):
-		plt.rcParams['font.size'] = 7		
-		output_path = os.path.join('data','output',"%s.png"%(self.ticker))
-		Strategy.check_parents_dir_exist(output_path)
-
-		x = [datetime.datetime.strptime(d, "%Y-%m-%d").date() for d in date]
-		y = price_hist
-
-		fig, ax = plt.subplots()
-		ax.plot(x, y, 'w', linewidth=0.25, label="c")
-
-		ax.set(xlabel='time', ylabel='Price', title='%s Trade Record'%(self.ticker))
-		ax.grid()
-		
-		ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-		ax.xaxis.set_major_locator(mdates.DayLocator(interval=int(  len(date)/10 )))
-		ax.tick_params(axis='x', labelrotation=45, labelsize=5)
-
-		plt.close(fig) #not showing in the jupyter lab
-		fig.savefig(output_path, dpi = 250)
-
 
 	@staticmethod
 	def check_parents_dir_exist(path):
@@ -196,31 +176,31 @@ class Strategy(object):
 		if not os.path.exists(parents_dir):
 			os.makedirs(parents_dir)		
 
-	@staticmethod
-	def plot_trade_graph(date, price_hist, ticker):
-		plt.rcParams['font.size'] = 7		
-		output_path = os.path.join('data','output',"%s.png"%(ticker))
-		Strategy.check_parents_dir_exist(output_path)
-
-		x = [datetime.datetime.strptime(d, "%Y-%m-%d").date() for d in date]
-		y = price_hist
-
-		fig, ax = plt.subplots()
-		ax.plot(x, y, 'w', linewidth=0.25, label="c")
-
-		ax.set(xlabel='time', ylabel='Price', title='%s Trade Record'%(ticker))
-		ax.grid()
-		
-		ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-		ax.xaxis.set_major_locator(mdates.DayLocator(interval=int(  len(date)/10 )))
-		ax.tick_params(axis='x', labelrotation=45, labelsize=5)
-
-		plt.close(fig) #not showing in the jupyter lab
-		fig.savefig(output_path, dpi = 250)
-
 
 	@staticmethod
 	def select_rows_according_to_dates(df, starting_date = None, ending_date = None):
 		if starting_date == None: starting_date = min(df['date'].values) 
 		if ending_date == None  :   ending_date =  max(df['date'].values) 
 		return df[ (df['date'] >= starting_date ) & ( df['date'] <= ending_date ) ]
+
+
+
+	@staticmethod
+	def make_assessment(df, index_column_name, benchmark_column_name, frequency = 'Q'):
+		dfs = Simple_Anlysis.split_df_according_to_frequency(df, frequency)
+		re_df = dict()
+		for i in range(0, len(dfs)):
+			df_current_period, df_cumulated = dfs[i], dfs[:i]
+			_, end_date = Simple_Anlysis.get_first_and_last_record_of_a_df(df, 'date')
+
+			benchmark_f_o_f_return = Simple_Anlysis.caculate_period_on_period_return(df_current_period, benchmark_column_name)
+			index_f_o_f_return = Simple_Anlysis.caculate_period_on_period_return(df_current_period, benchmark_column_name)			
+
+
+			benchmark_cumulated_return = Simple_Anlysis.caculate_period_on_period_return(df_cumulated, benchmark_column_name)
+			index_cumulated_return = Simple_Anlysis.caculate_period_on_period_return(df_cumulated, benchmark_column_name)						
+			# cumulated_return =
+
+			re_df[end_date] = [benchmark_f_o_f_return, index_f_o_f_return, benchmark_cumulated_return, index_cumulated_return] 
+
+		return pd.DataFrame(re_df, index = ["bench_%s_on_%s_re"%(frequency,frequency),"index_%s_on_%s_re"%(frequency,frequency), "bench_cumu_re", "index_cumu_re" ] )

@@ -10,6 +10,6 @@ from Portfolio import *
 # holding_list = ["SVXY"],
 
 #other idea is to compare tech/borad market 
-simulator = Portfolio(total_balance = 100000, underlying = None ,holding_list = ["VIXY","UVXY","VXX"], indices = ["^VVIX"], data_start_date = "2016-01-01", sim_start_date = "2022-01-01" )
+simulator = Portfolio(total_balance = 100000, underlying = None ,holding_list = ["VIXY","UVXY","VXX"], indices = ["SP500","^VVIX"], data_start_date = "2016-01-01", sim_start_date = "2022-01-01" )
 # simulator = Portfolio(total_balance = 100000, underlying = None ,holding_list = ["VIXY","UVXY","VXX","SVXY"], indices = ["^VVIX"], data_start_date = "2016-01-01", sim_start_date = "2022-01-01" )
 # simulator = Portfolio(total_balance = 100000, underlying = "QQQ",holding_list = ["SVXY"],  data_start_date = "2015-01-01", sim_start_date = "2020-09-01" )

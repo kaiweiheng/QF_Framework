@@ -1,3 +1,5 @@
+import numpy as np
+import pandas as pd
 class Preprocessor(object):
 	"""docstring for Preprocessor"""
 	def __init__(self, arg):
@@ -15,3 +17,13 @@ class Preprocessor(object):
 		return price['re'].values
 
 
+	@staticmethod
+	def moving_average(df, column_names, window_length = 5):
+		df = df[column_names].values
+		output = []
+		for i in range(0, len(df)):
+			if i < window_length:
+				output.append(np.nan)
+			else:
+				output.append(np.mean(df[ i - window_length : i ]))
+		return pd.DataFrame(output)

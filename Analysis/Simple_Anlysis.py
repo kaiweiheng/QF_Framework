@@ -1,8 +1,11 @@
 import os
-import xlsxwriter
+import sys
 from Strategy import *
 from datetime import date
 import matplotlib.pyplot as plt
+
+sys.path.append("Preprocess")
+from Preprocessor import *
 
 class Simple_Anlysis(object):
 	"""docstring for Simple_Anlysis"""
@@ -125,16 +128,77 @@ class Simple_Anlysis(object):
 		plt.close(fig) #not showing in the jupyter lab
 		fig.savefig(output_path, dpi = 250)
 
+	@staticmethod
+	def split_df_according_to_frequency(df, frequency = 'BM'):
+		'''
+		BM : business month end
+		BQ : business quarter end 
+		BY : business year end
+		'''
+		output = []
+		group = df.groupby(pd.Grouper(key='date', freq = frequency))
+		for period_end_date, g in group:
+			output.append(g)
+		return output
 
 	@staticmethod
-	def calculate_cumulated_return():
-		return 0
-
-	@staticmethod
-	def calculate_annualised_return():
-		return 0
+	def get_first_and_last_record_of_a_df(df, column):
+		
+		df = df[column].values
+		return df[0], df[-1]
 
 
 	@staticmethod
-	def calculate_beta():
-		return 0
+	def caculate_period_on_period_return(df, column, annualise = False):
+		'''
+		to give a period of values record, give period return
+
+		to give a cumulated period of values record, give cumulated return 
+		'''
+		start_value, end_value = Simple_Anlysis.get_first_and_last_record_of_a_df(df, column)
+		return (end_value - start_value) / start_value if annualise == False else   255 * (end_value - start_value) / (start_value * len(df)) 
+
+
+	@staticmethod
+	def calculate_sharp_ratio(df, index_column_name, benchmark_column_name):
+		# (index_re - benchmark_re)/ var(index_re)
+		index_return = (df[index_column_name].values[-1] - df[index_column_name].values[0])/df[index_column_name].values[0]
+		benchmark_return = (df[benchmark_column_name].values[-1] - df[benchmark_column_name].values[0])/df[benchmark_column_name].values[0]		
+
+		df['re_%s'%(benchmark_column_name)] = Preprocessor.calculate_return(df[ ['date',benchmark_column_name] ], benchmark_column_name, benchmark_column_name)		
+		df = df[['re_%s'%(benchmark_column_name)]].dropna()	
+
+		benchmark_variance = 255 * df['re_%s'%(benchmark_column_name)].var()	
+
+		index_return = 255 * index_return/len(df)
+		benchmark_return = 255 * benchmark_return / len(df)
+
+
+		return ( index_return - benchmark_return )/ benchmark_variance
+
+	@staticmethod
+	def calculate_max_draw_down(df, column):
+		df = df[column].values
+		max_value_record, draw_back_record = df[0], 0
+
+		for i in range(1, len(df)):
+			current_value = df[i]
+
+			max_value_record = max(current_value, max_value_record)
+
+			current_draw_back = (current_value - max_value_record)/max_value_record 
+
+			draw_back_record = min(draw_back_record, current_draw_back)
+		return draw_back_record
+
+	@staticmethod
+	def calculate_beta(df, index_column_name, benchmark_column_name):
+		df['re_%s'%(index_column_name)] = Preprocessor.calculate_return(df[ ['date',index_column_name] ], index_column_name, index_column_name)
+		df['re_%s'%(benchmark_column_name)] = Preprocessor.calculate_return(df[ ['date',benchmark_column_name] ], benchmark_column_name, benchmark_column_name)		
+		df = df[['re_%s'%(index_column_name),'re_%s'%(benchmark_column_name)]].dropna()
+
+		covariance =  df.cov().values[0][1]
+		variance = df['re_%s'%(benchmark_column_name)].var()
+		beta = covariance / variance
+
+		return beta, covariance, variance

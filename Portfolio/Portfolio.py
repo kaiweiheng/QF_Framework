@@ -9,7 +9,8 @@ sys.path.append("Strategy")
 from Grid_Trade import *
 from VIX_arbitrage import *
 
-
+sys.path.append("Preprocess")
+from Preprocessor import *
 
 
 
@@ -36,7 +37,7 @@ class Portfolio(object):
 		#init the total balance
 		self.strategy_obj_list = []
 		self.holding_list = []
-		self.indices_value_dict = dict()
+		self.benchmark_index = dict()
 
 		#to get all necessary data to make analysis
 		if underlying != None:
@@ -49,8 +50,11 @@ class Portfolio(object):
 
 		if indices != None:
 			for index in indices:
-				self.indices_value_dict[index] = obb_Price_Collector.get_value_for_an_index(index)
-
+				self.benchmark_index[index] = obb_Price_Collector.get_value_for_an_index(index)
+				self.benchmark_index[index]['re_%s'%(index)] = Preprocessor.calculate_return(self.benchmark_index[index][ ['date','value'] ], 'value', 'value')
+				self.benchmark_index[index]['c_%s'%(index)] = self.benchmark_index[index]['value']
+				self.benchmark_index[index] = self.benchmark_index[index].dropna(subset = ['re_%s'%(index)])
+				self.benchmark_index[index] = self.benchmark_index[index][['date','c_%s'%(index),'re_%s'%(index)]]
 
 		self.holding_list = [l for l in self.holding_list if type(l) != float] #in case cash holding for etf will cause error
 		print("Retriving Data for Following products %s \n"%(self.holding_list))
@@ -68,7 +72,7 @@ class Portfolio(object):
 
 		self.run_sim_at_a_data_set(data_set = 'validation_price', plot_diff = True, plot_pnl = True)		
 
-		self.run_sim_at_a_data_set(data_set = 'testing_price', plot_diff = True, plot_pnl = True)					
+		# self.run_sim_at_a_data_set(data_set = 'testing_price', plot_diff = True, plot_pnl = True)					
 		
 
 	def run_sim_at_a_data_set(self, data_set, plot_diff = False, plot_pnl = False):
@@ -79,21 +83,21 @@ class Portfolio(object):
 			product_a_ticker , product_b_ticker = pairs[0], pairs[1]
 			self.strategy_obj_list.append(  
 				VIX_arbitrage(init_balance = 10000 , daily_price_hist = self.daily_price[product_a_ticker], ticker = product_a_ticker, sim_start_date = self.sim_start_date,
-				VIX_his = self.indices_value_dict['^VVIX'], daily_price_of_another_product = self.daily_price[product_b_ticker] , ticker_of_another_product = product_b_ticker ))		
+				tracking_index_ticker = "^VVIX", tracking_index_hist = self.benchmark_index["^VVIX"]  , 
+				daily_price_of_another_product = self.daily_price[product_b_ticker] , ticker_of_another_product = product_b_ticker ))		
 
 		aggregated_trading_record = []
 		for obj in self.strategy_obj_list:
 
-			quantiles =  obj.training_price['diff'].quantile([.1, .5]).values
+			#to get hyperparameter from the training set
+			quantiles =  obj.training_price['diff'].quantile([.1, .55]).values
 			lower_quantile, higher_quantile = quantiles[0], quantiles[1]
 
+			#simulation and evaluation
 			for date in getattr(obj, data_set)['date'].values:
-			# for date in obj.training_dates:
 				obj.determin_action_of_a_day(date, lower_quantile, higher_quantile)
 
 			trade_record =  pd.DataFrame(obj.trade_record_for_paired_product,columns=['date', 'price', 'quantity','ticker']) 
-			print("%s_%s %s traded %s, end value %s \n lower %.3f higher %.3f\n"%(obj.ticker, obj.ticker_of_another_product , data_set , obj.have_trigged_trade 
-				, obj.total_value_records[-1], lower_quantile, higher_quantile ) )		
 
 			for record in obj.trade_record_already_processed:
 				aggregated_trading_record.append(record.to_DataFrame())
@@ -101,37 +105,37 @@ class Portfolio(object):
 			trade_record = trade_record['quantity'].values
 
 
-			# Simple_Anlysis.plot_two_factors_graph( getattr(obj, data_set)['date'].values, 
+			# Simple_Anlysis.plot_trade_and_diff_graph( getattr(obj, data_set)['date'].values, 
 			# 	obj.total_value_records, getattr(obj, data_set)['diff'].values, 
-			# 	"%s_%s_%s"%(obj.ticker, obj.ticker_of_another_product, data_set) )
+			# 	"%s_%s_%s"%(obj.ticker, obj.ticker_of_another_product, data_set), trade_record )	
+
+			tmp = pd.merge(getattr(obj, data_set), self.benchmark_index['SP500'], how = 'inner', left_on = 'date', right_on = 'date' )
+
+
 			Simple_Anlysis.plot_trade_and_diff_graph( getattr(obj, data_set)['date'].values, 
-				obj.total_value_records, getattr(obj, data_set)['diff'].values, 
-				"%s_%s_%s"%(obj.ticker, obj.ticker_of_another_product, data_set), trade_record )			
+				obj.total_value_records, tmp['c_SP500'].values, 
+				"%s_%s_%s"%(obj.ticker, obj.ticker_of_another_product, data_set), trade_record )
 
-			# if plot_diff:
-			# 	Simple_Anlysis.plot_trade_graph( getattr(obj, data_set)['date'].values, getattr(obj, data_set)['diff'].values, "%s_%s_%s_diff"%(obj.ticker, obj.ticker_of_another_product, data_set), trade_record)
-			
-			# if plot_pnl:
-			# 	Simple_Anlysis.plot_trade_graph( getattr(obj, data_set)['date'].values, obj.total_value_records, "%s_%s_%s"%(obj.ticker, obj.ticker_of_another_product, data_set), trade_record)		
+			# Simple_Anlysis.plot_trade_and_diff_graph( getattr(obj, data_set)['date'].values, 
+			# 	getattr(obj, data_set)['mv10'].values, getattr(obj, data_set)['mv5'].values, 
+			# 	"%s_%s_%s"%(obj.ticker, obj.ticker_of_another_product, data_set), trade_record )
+	
 
-		# aggregated_trading_record = pd.concat(aggregated_trading_record)
-		# aggregated_trading_record.to_csv(os.path.join('data','output','total_trade_record.csv'), index=False)
+			tmp = pd.DataFrame({ 'date': getattr(obj, data_set)['date'].values, 'total_value' : obj.total_value_records })
+			tmp  = pd.merge(tmp, self.benchmark_index['SP500'], how = 'inner', left_on = 'date', right_on = 'date')
+
+
+			assessment = obj.make_assessment(tmp, 'total_value', 'c_SP500', os.path.join('data','output','%s_%s'%(obj.ticker, obj.ticker_of_another_product) ), data_set, 'Q')
+
+
+			print("%s_%s %s traded %s, end value %s \n lower %.3f higher %.3f \n"%(obj.ticker, obj.ticker_of_another_product , data_set , obj.have_trigged_trade 
+				, obj.total_value_records[-1], lower_quantile, higher_quantile) )		
+
+
+
+
+		aggregated_trading_record = pd.concat(aggregated_trading_record)
+		aggregated_trading_record.to_csv(os.path.join('data','output','%s_total_trade_record.csv'%(data_set) ), index=False)
 
 
 		return 0
-
-
-		'''
-		#simulate with optimized hyperparameter as out sample testing
-		for obj in self.strategy_obj_list:
-			sim_dates = obj.get_sim_dates(num_of_sim_date)
-			for date in sim_dates:
-				obj.determin_action_of_a_day(date)
-
-		# eval and draw results
-		for obj in self.strategy_obj_list:
-			sim_dates = obj.get_sim_dates(num_of_sim_date)
-			if obj.have_trigged_trade != 0:
-				obj.plot_trade_graph( sim_dates , obj.daily_peice_hist[ (obj.daily_peice_hist['date'] >= sim_dates[0]) & (obj.daily_peice_hist['date'] <= sim_dates[-1])   ]['c'].values)
-				print("%s traded %s \n"%(obj.ticker, obj.have_trigged_trade))
-		'''
